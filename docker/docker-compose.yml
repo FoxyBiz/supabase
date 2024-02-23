@@ -1,3 +1,9 @@
+# Usage
+#   Start:          docker compose up
+#   With helpers:   docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml up
+#   Stop:           docker compose down
+#   Destroy:        docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml down -v --remove-orphans
+
 name: supabase
 version: "3.8"
 services:
@@ -46,9 +52,9 @@ services:
     restart: unless-stopped
     # https://unix.stackexchange.com/a/294837
     entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
-    ports:
-     - ${KONG_HTTP_PORT}:8000/tcp
-     - ${KONG_HTTPS_PORT}:8443/tcp
+    #ports:
+    #  - ${KONG_HTTP_PORT}:8000/tcp
+    #  - ${KONG_HTTPS_PORT}:8443/tcp
     depends_on:
       analytics:
         condition: service_healthy
@@ -287,6 +293,7 @@ services:
       - start
       - --main-service
       - /home/deno/functions/main
+
   analytics:
     container_name: supabase-analytics
     image: supabase/logflare:1.4.0
@@ -373,3 +380,26 @@ services:
       - ./volumes/db/data:/var/lib/postgresql/data:Z
       # Changes required for Analytics support
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
+
+  vector:
+    container_name: supabase-vector
+    image: timberio/vector:0.28.1-alpine
+    healthcheck:
+      test:
+        [
+
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://vector:9001/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    volumes:
+      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
+      # - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro // Reason is it's occures error in prod'n
+
+    command: [ "--config", "etc/vector/vector.yml" ]
